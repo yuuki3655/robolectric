@@ -5,6 +5,7 @@ import java.nio.file.FileSystem;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import javax.annotation.Nonnull;
+import org.robolectric.internal.bytecode.Interceptors;
 import org.robolectric.internal.bytecode.Sandbox;
 import org.robolectric.internal.dependency.DependencyJar;
 import org.robolectric.internal.dependency.DependencyResolver;
@@ -21,8 +22,8 @@ public class SdkEnvironment extends Sandbox {
   private final SdkConfig compileTimeSdkConfig;
 
   public SdkEnvironment(SdkConfig sdkConfig, ClassLoader robolectricClassLoader,
-      SdkConfig compileTimeSdkConfig) {
-    super(robolectricClassLoader);
+      SdkConfig compileTimeSdkConfig, Interceptors interceptors) {
+    super(robolectricClassLoader, interceptors);
     this.sdkConfig = sdkConfig;
     this.compileTimeSdkConfig = compileTimeSdkConfig;
   }

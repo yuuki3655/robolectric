@@ -8,6 +8,7 @@ import java.util.Objects;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import org.robolectric.internal.bytecode.InstrumentationConfiguration;
+import org.robolectric.internal.bytecode.Interceptors;
 import org.robolectric.internal.bytecode.SandboxClassLoader;
 import org.robolectric.internal.dependency.DependencyResolver;
 import org.robolectric.pluginapi.SdkProvider;
@@ -51,7 +52,8 @@ public class SandboxFactory {
       URL[] urls = dependencyResolver.getLocalArtifactUrls(sdkConfig.getAndroidSdkDependency());
 
       ClassLoader robolectricClassLoader = createClassLoader(instrumentationConfig, urls);
-      sdkEnvironment = createSdkEnvironment(sdkConfig, robolectricClassLoader);
+      sdkEnvironment = createSdkEnvironment(sdkConfig, robolectricClassLoader,
+          instrumentationConfig.getInterceptors());
 
       sdkToEnvironment.put(key, sdkEnvironment);
     }
@@ -59,9 +61,10 @@ public class SandboxFactory {
   }
 
   protected SdkEnvironment createSdkEnvironment(
-      SdkConfig sdkConfig, ClassLoader robolectricClassLoader) {
+      SdkConfig sdkConfig, ClassLoader robolectricClassLoader, Interceptors interceptors) {
     return new SdkEnvironment(
-        sdkConfig, robolectricClassLoader, sdkProvider.getMaxSupportedSdkConfig());
+        sdkConfig, robolectricClassLoader, sdkProvider.getMaxSupportedSdkConfig(),
+        interceptors);
   }
 
   @Nonnull

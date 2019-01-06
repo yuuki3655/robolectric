@@ -1,7 +1,7 @@
 package org.robolectric.internal.bytecode;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.robolectric.internal.bytecode.InstrumentationConfigurationTest.allInterceptors;
+import static org.robolectric.android.interceptors.AndroidInterceptorsTest.allInterceptors;
 
 import android.os.Build;
 import java.lang.reflect.Modifier;

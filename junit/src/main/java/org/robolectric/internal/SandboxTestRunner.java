@@ -48,20 +48,27 @@ public class SandboxTestRunner extends BlockJUnit4ClassRunner {
     BASE_SHADOW_MAP = ShadowMap.createFromShadowProviders(shadowProviders);
   }
 
-  private final Interceptors interceptors;
+  private Interceptors interceptors;
   private final List<PerfStatsReporter> perfStatsReporters;
   private final HashSet<Class<?>> loadedTestClasses = new HashSet<>();
 
   public SandboxTestRunner(Class<?> klass) throws InitializationError {
     super(klass);
 
-    interceptors = new Interceptors(Lists.newArrayList(ServiceLoader.load(Interceptor.class)));
     perfStatsReporters = Lists.newArrayList(getPerfStatsReporters().iterator());
   }
 
   @Nonnull
   protected Iterable<PerfStatsReporter> getPerfStatsReporters() {
     return ServiceLoader.load(PerfStatsReporter.class);
+  }
+
+  @Nonnull
+  protected Interceptors getInterceptors() {
+    if (interceptors == null) {
+      interceptors = new Interceptors(Lists.newArrayList(ServiceLoader.load(Interceptor.class)));
+    }
+    return interceptors;
   }
 
   @Override
@@ -132,7 +139,7 @@ public class SandboxTestRunner extends BlockJUnit4ClassRunner {
   protected Sandbox getSandbox(FrameworkMethod method) {
     InstrumentationConfiguration instrumentationConfiguration = createClassLoaderConfig(method);
     ClassLoader sandboxClassLoader = new SandboxClassLoader(ClassLoader.getSystemClassLoader(), instrumentationConfiguration);
-    return new Sandbox(sandboxClassLoader);
+    return new Sandbox(sandboxClassLoader, getInterceptors());
   }
 
   /**
@@ -199,7 +206,7 @@ public class SandboxTestRunner extends BlockJUnit4ClassRunner {
     ShadowMap shadowMap = builder.build();
     sandbox.replaceShadowMap(shadowMap);
 
-    sandbox.configure(createClassHandler(shadowMap, sandbox), interceptors);
+    sandbox.configure(createClassHandler(shadowMap, sandbox));
   }
 
   @Override protected Statement methodBlock(final FrameworkMethod method) {
@@ -329,7 +336,7 @@ public class SandboxTestRunner extends BlockJUnit4ClassRunner {
 
   @Nonnull
   protected ClassHandler createClassHandler(ShadowMap shadowMap, Sandbox sandbox) {
-    return new ShadowWrangler(shadowMap, 0, interceptors);
+    return new ShadowWrangler(shadowMap, 0, getInterceptors());
   }
 
   protected boolean shouldIgnore(FrameworkMethod method) {
