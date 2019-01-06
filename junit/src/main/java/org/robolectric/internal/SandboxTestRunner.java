@@ -55,23 +55,13 @@ public class SandboxTestRunner extends BlockJUnit4ClassRunner {
   public SandboxTestRunner(Class<?> klass) throws InitializationError {
     super(klass);
 
-    interceptors = new Interceptors(findInterceptors());
+    interceptors = new Interceptors(Lists.newArrayList(ServiceLoader.load(Interceptor.class)));
     perfStatsReporters = Lists.newArrayList(getPerfStatsReporters().iterator());
   }
 
   @Nonnull
   protected Iterable<PerfStatsReporter> getPerfStatsReporters() {
     return ServiceLoader.load(PerfStatsReporter.class);
-  }
-
-  @Nonnull
-  protected Collection<Interceptor> findInterceptors() {
-    return Collections.emptyList();
-  }
-
-  @Nonnull
-  protected Interceptors getInterceptors() {
-    return interceptors;
   }
 
   @Override
@@ -209,7 +199,7 @@ public class SandboxTestRunner extends BlockJUnit4ClassRunner {
     ShadowMap shadowMap = builder.build();
     sandbox.replaceShadowMap(shadowMap);
 
-    sandbox.configure(createClassHandler(shadowMap, sandbox), getInterceptors());
+    sandbox.configure(createClassHandler(shadowMap, sandbox), interceptors);
   }
 
   @Override protected Statement methodBlock(final FrameworkMethod method) {
@@ -232,7 +222,6 @@ public class SandboxTestRunner extends BlockJUnit4ClassRunner {
         final ClassLoader priorContextClassLoader = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(sandbox.getRobolectricClassLoader());
 
-        //noinspection unchecked
         Class bootstrappedTestClass = sandbox.bootstrappedClass(getTestClass().getJavaClass());
         HelperTestRunner helperTestRunner = getHelperTestRunner(bootstrappedTestClass);
         helperTestRunner.frameworkMethod = method;

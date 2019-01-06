@@ -24,7 +24,6 @@ import org.junit.Ignore;
 import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.Statement;
-import org.robolectric.android.AndroidInterceptors;
 import org.robolectric.android.internal.ParallelUniverse;
 import org.robolectric.annotation.Config;
 import org.robolectric.internal.AndroidConfigurer;
@@ -43,6 +42,7 @@ import org.robolectric.internal.bytecode.ClassHandler;
 import org.robolectric.internal.bytecode.InstrumentationConfiguration;
 import org.robolectric.internal.bytecode.InstrumentationConfiguration.Builder;
 import org.robolectric.internal.bytecode.Interceptor;
+import org.robolectric.internal.bytecode.Interceptors;
 import org.robolectric.internal.bytecode.Sandbox;
 import org.robolectric.internal.bytecode.SandboxClassLoader;
 import org.robolectric.internal.bytecode.ShadowMap;
@@ -93,15 +93,17 @@ public class RobolectricTestRunner extends SandboxTestRunner {
     final ApkLoader apkLoader;
     final SdkPicker sdkPicker;
     final org.robolectric.pluginapi.ConfigMerger configMerger;
+    final Interceptors interceptors;
 
     @Inject
     public Ctx(SandboxFactory sandboxFactory, ApkLoader apkLoader,
         SdkPicker sdkPicker,
-        org.robolectric.pluginapi.ConfigMerger configMerger) {
+        org.robolectric.pluginapi.ConfigMerger configMerger, Interceptors interceptors) {
       this.sandboxFactory = sandboxFactory;
       this.apkLoader = apkLoader;
       this.sdkPicker = sdkPicker;
       this.configMerger = configMerger;
+      this.interceptors = interceptors;
     }
   }
 
@@ -137,13 +139,7 @@ public class RobolectricTestRunner extends SandboxTestRunner {
   @Override
   @Nonnull
   protected ClassHandler createClassHandler(ShadowMap shadowMap, Sandbox sandbox) {
-    return new ShadowWrangler(shadowMap, ((SdkEnvironment) sandbox).getSdkConfig().getApiLevel(), getInterceptors());
-  }
-
-  @Override
-  @Nonnull // todo
-  protected Collection<Interceptor> findInterceptors() {
-    return AndroidInterceptors.all();
+    return new ShadowWrangler(shadowMap, ((SdkEnvironment) sandbox).getSdkConfig().getApiLevel(), ctx.interceptors);
   }
 
   /**
@@ -161,7 +157,7 @@ public class RobolectricTestRunner extends SandboxTestRunner {
   @Override @Nonnull
   protected InstrumentationConfiguration createClassLoaderConfig(final FrameworkMethod method) {
     Builder builder = new Builder(super.createClassLoaderConfig(method));
-    AndroidConfigurer.configure(builder, getInterceptors());
+    AndroidConfigurer.configure(builder, ctx.interceptors);
     AndroidConfigurer.withConfig(builder, ((RobolectricFrameworkMethod) method).config);
     return builder.build();
   }
