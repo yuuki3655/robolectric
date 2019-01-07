@@ -1,8 +1,11 @@
 package org.robolectric.util.inject;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
@@ -30,7 +33,7 @@ public class Injector {
 
   public synchronized <T> Injector register(
       @Nonnull Class<T> type, @Nonnull Class<? extends T> defaultClass) {
-    registerInternal(new Key(type), defaultClass);
+    registerMemoized(new Key(type), defaultClass);
     return this;
   }
 
@@ -40,9 +43,14 @@ public class Injector {
     return this;
   }
 
-  private synchronized <T> Provider<T> registerInternal(
+  private <T> Provider<T> registerMemoized(
       @Nonnull Key key, @Nonnull Class<? extends T> defaultClass) {
-    Provider<T> provider = new MemoizingProvider<>(() -> inject(defaultClass));
+    return registerMemoized(key, () -> inject(defaultClass));
+  }
+
+  private synchronized <T> Provider<T> registerMemoized(
+      @Nonnull Key key, Provider<T> tProvider) {
+    Provider<T> provider = new MemoizingProvider<>(tProvider);
     providers.put(key, provider);
     return provider;
   }
@@ -105,14 +113,17 @@ public class Injector {
           }
         }
 
+        if (implClass == null && clazz.isArray()) {
+          Provider<T> tProvider = new MultiProvider(clazz.getComponentType());
+          return registerMemoized(new Key(clazz), tProvider).get();
+        }
+
         if (implClass == null) {
           throw new InjectionException(clazz, "no provider found");
         }
 
         // replace this with the found provider for future lookups...
-        Provider<T> tProvider;
-        tProvider = registerInternal(new Key(clazz), implClass);
-        return tProvider.get();
+        return registerMemoized(new Key(clazz), implClass).get();
       }
     });
     return (Provider<T>) provider;
@@ -171,6 +182,24 @@ public class Injector {
         delegate = null;
       }
       return instance;
+    }
+  }
+
+  private class MultiProvider<T> implements Provider<T[]> {
+
+    private final Class<T> clazz;
+
+    MultiProvider(Class<T> clazz) {
+      this.clazz = clazz;
+    }
+
+    @Override
+    public T[] get() {
+      List<T> plugins = new ArrayList<>();
+      for (Class<? extends T> pluginClass : pluginFinder.findPlugins(clazz)) {
+        plugins.add(inject(pluginClass));
+      }
+      return plugins.toArray((T[]) Array.newInstance(clazz, 0));
     }
   }
 }

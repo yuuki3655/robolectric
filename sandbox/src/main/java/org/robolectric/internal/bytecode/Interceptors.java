@@ -6,12 +6,14 @@ import com.google.auto.service.AutoService;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import javax.inject.Inject;
 import org.robolectric.util.Function;
 
 @AutoService(Interceptors.class)
 public class Interceptors {
   private final Map<MethodRef, Interceptor> interceptors = new HashMap<>();
 
+  @Inject
   public Interceptors(Interceptor... interceptors) {
     this(asList(interceptors));
   }
