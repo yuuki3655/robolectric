@@ -89,42 +89,45 @@ public class Injector {
   @SuppressWarnings("unchecked")
   private <T> T inject(@Nonnull Class<? extends T> clazz) {
     try {
-      Constructor<T> defaultCtor = null;
-      Constructor<T> injectCtor = null;
+      List<Constructor<T>> injectCtors = new ArrayList<>();
+      List<Constructor<T>> otherCtors = new ArrayList<>();
 
-      for (Constructor<?> ctor : clazz.getDeclaredConstructors()) {
-        if (ctor.getParameterCount() == 0) {
-          defaultCtor = (Constructor<T>) ctor;
-        } else if (ctor.isAnnotationPresent(Inject.class)) {
-          if (injectCtor != null) {
-            throw new InjectionException(clazz, "multiple @Inject constructors");
-          }
-          injectCtor = (Constructor<T>) ctor;
+      for (Constructor<?> ctor : clazz.getConstructors()) {
+        if (ctor.isAnnotationPresent(Inject.class)) {
+          injectCtors.add((Constructor<T>) ctor);
+        } else {
+          otherCtors.add((Constructor<T>) ctor);
         }
       }
 
-      if (defaultCtor != null) {
-        return defaultCtor.newInstance();
+      Constructor<T> ctor;
+      if (injectCtors.size() > 1) {
+        throw new InjectionException(clazz, "multiple public @Inject constructors");
+      } else if (injectCtors.size() == 1) {
+        ctor = injectCtors.get(0);
+      } else if (otherCtors.size() > 1) {
+        throw new InjectionException(clazz, "multiple public constructors");
+      } else if (otherCtors.size() == 1) {
+        ctor = otherCtors.get(0);
+      } else {
+        throw new InjectionException(clazz, "no public constructor");
       }
 
-      if (injectCtor != null) {
-        final Object[] params = new Object[injectCtor.getParameterCount()];
+      final Object[] params = new Object[ctor.getParameterCount()];
 
-        Class<?>[] paramTypes = injectCtor.getParameterTypes();
-        for (int i = 0; i < paramTypes.length; i++) {
-          Class<?> paramType = paramTypes[i];
-          try {
-            params[i] = getInstance(paramType);
-          } catch (InjectionException e) {
-            throw new InjectionException(clazz,
-                "failed to inject " + paramType.getName() + " param", e);
-          }
+      Class<?>[] paramTypes = ctor.getParameterTypes();
+      for (int i = 0; i < paramTypes.length; i++) {
+        Class<?> paramType = paramTypes[i];
+        try {
+          params[i] = getInstance(paramType);
+        } catch (InjectionException e) {
+          throw new InjectionException(clazz,
+              "failed to inject " + paramType.getName() + " param", e);
         }
-
-        return injectCtor.newInstance(params);
       }
 
-      throw new InjectionException(clazz, "no default or @Inject constructor");
+      return ctor.newInstance(params);
+
     } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
       throw new InjectionException(clazz, e);
     }

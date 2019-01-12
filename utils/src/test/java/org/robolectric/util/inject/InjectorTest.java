@@ -96,7 +96,7 @@ public class InjectorTest {
   }
 
   @Test
-  public void shouldInjectConstructor() throws Exception {
+  public void shouldPreferSingularPublicConstructorAnnotatedInject() throws Exception {
     injector.register(Thing.class, MyThing.class);
     injector.register(Umm.class, MyUmm.class);
 
@@ -105,6 +105,22 @@ public class InjectorTest {
     assertThat(umm).isInstanceOf(MyUmm.class);
 
     MyUmm myUmm = (MyUmm) umm;
+    assertThat(myUmm.thing).isNotNull();
+    assertThat(myUmm.thing).isInstanceOf(MyThing.class);
+
+    assertThat(myUmm.thing).isSameAs(injector.getInstance(Thing.class));
+  }
+
+  @Test
+  public void shouldAcceptSingularPublicConstructorWithoutInjectAnnotation() throws Exception {
+    injector.register(Thing.class, MyThing.class);
+    injector.register(Umm.class, MyUmmNoInject.class);
+
+    Umm umm = injector.getInstance(Umm.class);
+    assertThat(umm).isNotNull();
+    assertThat(umm).isInstanceOf(MyUmmNoInject.class);
+
+    MyUmmNoInject myUmm = (MyUmmNoInject) umm;
     assertThat(myUmm.thing).isNotNull();
     assertThat(myUmm.thing).isInstanceOf(MyThing.class);
 
@@ -144,7 +160,20 @@ public class InjectorTest {
     private final Thing thing;
 
     @Inject
-    MyUmm(Thing thing) {
+    public MyUmm(Thing thing) {
+      this.thing = thing;
+    }
+
+    public MyUmm(String thingz) {
+      this.thing = null;
+    }
+  }
+
+  public static class MyUmmNoInject implements Umm {
+
+    private final Thing thing;
+
+    public MyUmmNoInject(Thing thing) {
       this.thing = thing;
     }
   }
