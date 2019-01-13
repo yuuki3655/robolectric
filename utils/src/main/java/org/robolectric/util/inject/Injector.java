@@ -3,11 +3,15 @@ package org.robolectric.util.inject;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import javax.annotation.concurrent.GuardedBy;
 import javax.inject.Inject;
 import javax.inject.Provider;
 
@@ -53,9 +57,22 @@ import javax.inject.Provider;
 @SuppressWarnings({"NewApi", "AndroidJdkLibsChecker"})
 public class Injector {
 
+  private final Injector superInjector;
   private final PluginFinder pluginFinder = new PluginFinder();
+
+  @GuardedBy("this")
   private final Map<Key, Provider<?>> providers = new HashMap<>();
+
+  @GuardedBy("this")
   private final Map<Key, Class<?>> defaultImpls = new HashMap<>();
+
+  public Injector() {
+    this.superInjector = null;
+  }
+
+  public Injector(Injector superInjector) {
+    this.superInjector = superInjector;
+  }
 
   public synchronized <T> Injector register(@Nonnull Class<T> type, @Nonnull T instance) {
     providers.put(new Key(type), () -> instance);
@@ -105,10 +122,12 @@ public class Injector {
         throw new InjectionException(clazz, "multiple public @Inject constructors");
       } else if (injectCtors.size() == 1) {
         ctor = injectCtors.get(0);
-      } else if (otherCtors.size() > 1) {
+      } else if (otherCtors.size() > 1 && !isSystem(clazz)) {
         throw new InjectionException(clazz, "multiple public constructors");
       } else if (otherCtors.size() == 1) {
         ctor = otherCtors.get(0);
+      } else if (isSystem(clazz)) {
+        throw new InjectionException(clazz, "nothing provided");
       } else {
         throw new InjectionException(clazz, "no public constructor");
       }
@@ -142,14 +161,24 @@ public class Injector {
         Class<? extends T> implClass = pluginFinder.findPlugin(clazz);
 
         if (implClass == null) {
-          synchronized (Injector.this) {
-            implClass = (Class<? extends T>) defaultImpls.get(key);
-          }
+          implClass = getDefaultImpl(key);
         }
 
         if (implClass == null && clazz.isArray()) {
           Provider<T> tProvider = new MultiProvider(clazz.getComponentType());
-          return registerMemoized(new Key(clazz), tProvider).get();
+          return registerMemoized(key, tProvider).get();
+        }
+
+        if (clazz.isAnnotationPresent(AutoFactory.class)) {
+          return registerMemoized(key, new FactoryProvider<>(clazz)).get();
+        }
+
+        if (!clazz.isInterface() && !Modifier.isAbstract(clazz.getModifiers())) {
+          implClass = clazz;
+        }
+
+        if (implClass == null && superInjector != null) {
+          return superInjector.getInstance(clazz);
         }
 
         if (implClass == null) {
@@ -157,10 +186,16 @@ public class Injector {
         }
 
         // replace this with the found provider for future lookups...
-        return registerMemoized(new Key(clazz), implClass).get();
+        return registerMemoized(key, implClass).get();
       }
+
     });
     return (Provider<T>) provider;
+  }
+
+  private synchronized <T> Class<? extends T> getDefaultImpl(Key key) {
+    Class<?> aClass = defaultImpls.get(key);
+    return (Class<? extends T>) aClass;
   }
 
   public <T> T getInstance(Class<T> clazz) {
@@ -171,6 +206,14 @@ public class Injector {
     }
 
     return provider.get();
+  }
+
+  private boolean isSystem(Class<?> clazz) {
+    if (clazz.isPrimitive()) {
+      return true;
+    }
+    Package aPackage = clazz.getPackage();
+    return aPackage == null || aPackage.getName().startsWith("java.");
   }
 
   private static class Key {
@@ -234,6 +277,32 @@ public class Injector {
         plugins.add(inject(pluginClass));
       }
       return plugins.toArray((T[]) Array.newInstance(clazz, 0));
+    }
+  }
+
+  private class FactoryProvider<T> implements Provider<T> {
+
+    private final Class<T> clazz;
+
+    public FactoryProvider(Class<T> clazz) {
+      this.clazz = clazz;
+    }
+
+    @Override
+    public T get() {
+      return (T) Proxy.newProxyInstance(clazz.getClassLoader(), new Class[]{clazz},
+          (proxy, method, args) -> create(method, args));
+    }
+
+    private Object create(Method method, Object[] args) {
+      Injector subInjector = new Injector(Injector.this);
+      Class<?>[] parameterTypes = method.getParameterTypes();
+      for (int i = 0; i < args.length; i++) {
+        Class paramType = parameterTypes[i];
+        Object arg = args[i];
+        subInjector.register(paramType, arg);
+      }
+      return subInjector.getInstance(method.getReturnType());
     }
   }
 }

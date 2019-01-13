@@ -7,7 +7,6 @@ import com.google.auto.service.AutoService;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 import javax.annotation.Priority;
 import javax.inject.Inject;
 import org.junit.Before;
@@ -42,19 +41,23 @@ public class InjectorTest {
         .isSameAs(thing);
   }
 
-  // specified in resources/META-INF/services/org.robolectric.util.inject.Thing
   @Test
   public void whenServiceSpecified_shouldProvideInstance() throws Exception {
     assertThat(injector.getInstance(Thing.class))
         .isInstanceOf(ThingFromServiceConfig.class);
   }
 
-  // specified in resources/META-INF/services/org.robolectric.util.inject.Thing
   @Test
   public void whenServiceSpecified_shouldUseSameInstance() throws Exception {
     Thing thing = injector.getInstance(Thing.class);
     assertThat(injector.getInstance(Thing.class))
         .isSameAs(thing);
+  }
+
+  @Test
+  public void whenConcreteClassRequested_shouldProvideInstance() throws Exception {
+    assertThat(injector.getInstance(MyUmm.class))
+        .isInstanceOf(MyUmm.class);
   }
 
   @Test
@@ -140,13 +143,25 @@ public class InjectorTest {
         .containsExactly(MultiThingX.class, MultiThingA.class).inOrder();
   }
 
+  @Test public void whenFactoryRequested_createsInjectedFactory() throws Exception {
+    Injector injector = new Injector();
+    injector.register(Umm.class, MyUmm.class);
+    FooFactory factory = injector.getInstance(FooFactory.class);
+    Foo chauncey = factory.create("Chauncey");
+    assertThat(chauncey.name).isEqualTo("Chauncey");
+  }
+
   /////////////////////////////
+
+  interface Thing {
+
+  }
 
   public static class MyThing implements Thing {
 
   }
 
-  @AutoService(ThingFromServiceConfig.class)
+  @AutoService(Thing.class)
   public static class ThingFromServiceConfig implements Thing {
 
   }
@@ -164,6 +179,7 @@ public class InjectorTest {
       this.thing = thing;
     }
 
+    @SuppressWarnings("unused")
     public MyUmm(String thingz) {
       this.thing = null;
     }
@@ -189,5 +205,23 @@ public class InjectorTest {
 
   @AutoService(MultiThing.class)
   public static class MultiThingX implements MultiThing {
+  }
+
+  static class Foo {
+
+    private final Thing thing;
+    private final Umm umm;
+    private final String name;
+
+    public Foo(Thing thing, Umm umm, String name) {
+      this.thing = thing;
+      this.umm = umm;
+      this.name = name;
+    }
+  }
+
+  @AutoFactory
+  interface FooFactory {
+    Foo create(String name);
   }
 }

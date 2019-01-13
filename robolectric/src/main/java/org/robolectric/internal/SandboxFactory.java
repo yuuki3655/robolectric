@@ -12,6 +12,7 @@ import org.robolectric.internal.bytecode.Interceptors;
 import org.robolectric.internal.bytecode.SandboxClassLoader;
 import org.robolectric.internal.dependency.DependencyResolver;
 import org.robolectric.pluginapi.SdkProvider;
+import org.robolectric.util.inject.AutoFactory;
 
 @SuppressLint("NewApi")
 public class SandboxFactory {
@@ -65,6 +66,11 @@ public class SandboxFactory {
     return new SdkEnvironment(
         sdkConfig, robolectricClassLoader, sdkProvider.getMaxSupportedSdkConfig(),
         interceptors);
+  }
+
+  @AutoFactory
+  interface SdkEnvironmentFactory {
+    SdkEnvironment create()
   }
 
   @Nonnull
