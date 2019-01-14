@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import javax.annotation.Priority;
 import javax.inject.Inject;
+import javax.inject.Named;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -132,7 +133,7 @@ public class InjectorTest {
 
   @Test
   public void whenArrayRequested_mayReturnMultiplePlugins() throws Exception {
-    MultiThing[] multiThings = new Injector().getInstance(MultiThing[].class);
+    MultiThing[] multiThings = injector.getInstance(MultiThing[].class);
 
     List<? extends Class<?>> pluginClasses =
         Arrays.stream(multiThings).map(Object::getClass)
@@ -144,13 +145,20 @@ public class InjectorTest {
   }
 
   @Test public void whenFactoryRequested_createsInjectedFactory() throws Exception {
-    Injector injector = new Injector();
     injector.register(Umm.class, MyUmm.class);
     FooFactory factory = injector.getInstance(FooFactory.class);
     Foo chauncey = factory.create("Chauncey");
     assertThat(chauncey.name).isEqualTo("Chauncey");
   }
 
+  @Test public void shouldInjectByNamedKeys() throws Exception {
+    injector
+        .register(new Injector.Key(String.class, "namedThing"), "named value")
+        .register(String.class, "unnamed value");
+    NamedParams namedParams = injector.getInstance(NamedParams.class);
+    assertThat(namedParams.withName).isEqualTo("named value");
+    assertThat(namedParams.withoutName).isEqualTo("unnamed value");
+  }
   /////////////////////////////
 
   interface Thing {
@@ -223,5 +231,18 @@ public class InjectorTest {
   @AutoFactory
   interface FooFactory {
     Foo create(String name);
+  }
+
+  static class NamedParams {
+
+    private final Thing thing;
+    private final String withName;
+    private final String withoutName;
+
+    public NamedParams(Thing thing, @Named("namedThing") String withName, String withoutName) {
+      this.thing = thing;
+      this.withName = withName;
+      this.withoutName = withoutName;
+    }
   }
 }
