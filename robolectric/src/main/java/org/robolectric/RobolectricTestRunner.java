@@ -11,14 +11,12 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.ServiceLoader;
 import javax.annotation.Nonnull;
-import javax.inject.Inject;
 import org.junit.AssumptionViolatedException;
 import org.junit.Ignore;
 import org.junit.runners.model.FrameworkMethod;
@@ -41,7 +39,6 @@ import org.robolectric.internal.ShadowProvider;
 import org.robolectric.internal.bytecode.ClassHandler;
 import org.robolectric.internal.bytecode.InstrumentationConfiguration;
 import org.robolectric.internal.bytecode.InstrumentationConfiguration.Builder;
-import org.robolectric.internal.bytecode.Interceptor;
 import org.robolectric.internal.bytecode.Interceptors;
 import org.robolectric.internal.bytecode.Sandbox;
 import org.robolectric.internal.bytecode.SandboxClassLoader;
@@ -82,10 +79,7 @@ public class RobolectricTestRunner extends SandboxTestRunner {
 
   protected static Injector defaultInjector() {
     return new Injector()
-        .register(Properties.class, System.getProperties())
-        .registerDefault(ApkLoader.class, ApkLoader.class)
-        .registerDefault(SandboxFactory.class, SandboxFactory.class)
-        .registerDefault(Ctx.class, Ctx.class);
+        .register(Properties.class, System.getProperties());
   }
 
   public static class Ctx {
@@ -95,7 +89,6 @@ public class RobolectricTestRunner extends SandboxTestRunner {
     final org.robolectric.pluginapi.ConfigMerger configMerger;
     final Interceptors interceptors;
 
-    @Inject
     public Ctx(SandboxFactory sandboxFactory, ApkLoader apkLoader,
         SdkPicker sdkPicker,
         org.robolectric.pluginapi.ConfigMerger configMerger, Interceptors interceptors) {

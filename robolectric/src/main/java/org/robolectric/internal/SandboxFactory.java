@@ -6,7 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nonnull;
-import javax.inject.Inject;
 import org.robolectric.internal.bytecode.InstrumentationConfiguration;
 import org.robolectric.internal.bytecode.Interceptors;
 import org.robolectric.internal.bytecode.SandboxClassLoader;
@@ -26,7 +25,6 @@ public class SandboxFactory {
   // Simple LRU Cache. SdkEnvironments are unique across InstrumentationConfiguration and SdkConfig
   private final LinkedHashMap<SandboxKey, SdkEnvironment> sdkToEnvironment;
 
-  @Inject
   public SandboxFactory(DependencyResolver dependencyResolver, SdkProvider sdkProvider) {
     this.dependencyResolver = dependencyResolver;
     this.sdkProvider = sdkProvider;
