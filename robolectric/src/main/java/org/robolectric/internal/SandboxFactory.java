@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nonnull;
+import javax.inject.Named;
 import org.robolectric.internal.bytecode.InstrumentationConfiguration;
 import org.robolectric.internal.bytecode.Interceptors;
 import org.robolectric.internal.bytecode.SandboxClassLoader;
@@ -21,13 +22,16 @@ public class SandboxFactory {
 
   private final DependencyResolver dependencyResolver;
   private final SdkProvider sdkProvider;
+  private final SdkEnvironmentFactory sdkEnvironmentFactory;
 
   // Simple LRU Cache. SdkEnvironments are unique across InstrumentationConfiguration and SdkConfig
   private final LinkedHashMap<SandboxKey, SdkEnvironment> sdkToEnvironment;
 
-  public SandboxFactory(DependencyResolver dependencyResolver, SdkProvider sdkProvider) {
+  public SandboxFactory(DependencyResolver dependencyResolver, SdkProvider sdkProvider,
+      SdkEnvironmentFactory sdkEnvironmentFactory) {
     this.dependencyResolver = dependencyResolver;
     this.sdkProvider = sdkProvider;
+    this.sdkEnvironmentFactory = sdkEnvironmentFactory;
 
     // We need to set the cache size of class loaders more than the number of supported APIs as
     // different tests may have different configurations.
@@ -51,24 +55,23 @@ public class SandboxFactory {
       URL[] urls = dependencyResolver.getLocalArtifactUrls(sdkConfig.getAndroidSdkDependency());
 
       ClassLoader robolectricClassLoader = createClassLoader(instrumentationConfig, urls);
-      sdkEnvironment = createSdkEnvironment(sdkConfig, robolectricClassLoader,
-          instrumentationConfig.getInterceptors());
+      sdkEnvironment =
+          sdkEnvironmentFactory.create(sdkConfig, robolectricClassLoader, sdkProvider.getMaxSupportedSdkConfig(),
+              instrumentationConfig.getInterceptors());
 
       sdkToEnvironment.put(key, sdkEnvironment);
     }
     return sdkEnvironment;
   }
 
-  protected SdkEnvironment createSdkEnvironment(
-      SdkConfig sdkConfig, ClassLoader robolectricClassLoader, Interceptors interceptors) {
-    return new SdkEnvironment(
-        sdkConfig, robolectricClassLoader, sdkProvider.getMaxSupportedSdkConfig(),
-        interceptors);
-  }
-
   @AutoFactory
-  interface SdkEnvironmentFactory {
-    SdkEnvironment create()
+  public interface SdkEnvironmentFactory {
+
+    SdkEnvironment create(
+        @Named("runtime") SdkConfig sdkConfig,
+        ClassLoader robolectricClassLoader,
+        @Named("compileTime") SdkConfig compileTimeSdkConfig,
+        Interceptors interceptors);
   }
 
   @Nonnull

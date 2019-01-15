@@ -81,7 +81,7 @@ public class Injector {
     return register(new Key<>(type), instance);
   }
 
-  public synchronized <T> Injector register(Key key, @Nonnull T instance) {
+  public synchronized <T> Injector register(Key<T> key, @Nonnull T instance) {
     providers.put(key, () -> instance);
     return this;
   }
@@ -105,12 +105,12 @@ public class Injector {
   }
 
   private <T> Provider<T> registerMemoized(
-      @Nonnull Key key, @Nonnull Class<? extends T> defaultClass) {
+      @Nonnull Key<T> key, @Nonnull Class<? extends T> defaultClass) {
     return registerMemoized(key, () -> inject(defaultClass));
   }
 
   private synchronized <T> Provider<T> registerMemoized(
-      @Nonnull Key key, Provider<T> tProvider) {
+      @Nonnull Key<T> key, Provider<T> tProvider) {
     Provider<T> provider = new MemoizingProvider<>(tProvider);
     providers.put(key, provider);
     return provider;
@@ -196,7 +196,7 @@ public class Injector {
         }
 
         if (clazz.isAnnotationPresent(AutoFactory.class)) {
-          return registerMemoized(key, new FactoryProvider<>(clazz)).get();
+          return registerMemoized(key, new ScopeBuilderProvider<>(clazz)).get();
         }
 
         if (isConcrete(clazz)) {
@@ -223,7 +223,7 @@ public class Injector {
     return !clazz.isInterface() && !Modifier.isAbstract(clazz.getModifiers());
   }
 
-  private synchronized <T> Class<? extends T> getDefaultImpl(Key key) {
+  private synchronized <T> Class<? extends T> getDefaultImpl(Key<T> key) {
     Class<?> aClass = defaultImpls.get(key);
     return (Class<? extends T>) aClass;
   }
@@ -273,7 +273,7 @@ public class Injector {
       if (!(o instanceof Key)) {
         return false;
       }
-      Key key = (Key) o;
+      Key<?> key = (Key) o;
       return theInterface.equals(key.theInterface) &&
           Objects.equals(name, key.name);
     }
@@ -281,6 +281,19 @@ public class Injector {
     @Override
     public int hashCode() {
       return Objects.hash(theInterface, name);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder buf = new StringBuilder();
+      buf.append("Key<").append(theInterface.getName());
+      if (name != null) {
+        buf.append(" named \"")
+            .append(name)
+            .append("\"");
+      }
+      buf.append(">");
+      return buf.toString();
     }
   }
 
@@ -321,11 +334,11 @@ public class Injector {
     }
   }
 
-  private class FactoryProvider<T> implements Provider<T> {
+  private class ScopeBuilderProvider<T> implements Provider<T> {
 
     private final Class<T> clazz;
 
-    public FactoryProvider(Class<T> clazz) {
+    public ScopeBuilderProvider(Class<T> clazz) {
       this.clazz = clazz;
     }
 
@@ -338,10 +351,12 @@ public class Injector {
     private Object create(Method method, Object[] args) {
       Injector subInjector = new Injector(Injector.this);
       Class<?>[] parameterTypes = method.getParameterTypes();
+      Annotation[][] parameterAnnotations = method.getParameterAnnotations();
       for (int i = 0; i < args.length; i++) {
-        Class paramType = parameterTypes[i];
+        Class<?> paramType = parameterTypes[i];
+        String name = findName(parameterAnnotations[i]);
         Object arg = args[i];
-        subInjector.register(paramType, arg);
+        subInjector.register(new Key(paramType, name), arg);
       }
       return subInjector.getInstance(method.getReturnType());
     }
